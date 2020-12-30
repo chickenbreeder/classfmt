@@ -8,6 +8,7 @@ use crate::constant_pool::{
     CONST_INTEGER
 };
 use crate::constant_pool::Constant;
+use crate::attributes::Attribute;
 
 #[derive(Debug)]
 pub struct RawClass<'c> {
@@ -16,7 +17,6 @@ pub struct RawClass<'c> {
     major_version: u16,
     constant_pool_count: u16,
     constant_pool: Vec<Constant<'c>>,
-
     access_flags: u16,
     this_class: u16,
     super_class: u16,
@@ -25,11 +25,12 @@ pub struct RawClass<'c> {
     field_count: u16
 }
 
-struct Field {
+struct Field<'c> {
     access_flags: u16,
     name_index: u16,
     descriptor_index: u16,
-    attributes_count: u16
+    attributes_count: u16,
+    attributes: Vec<Attribute<'c>>
 }
 
 impl<'c> RawClass<'c> {
@@ -149,10 +150,8 @@ impl<'c> RawClass<'c> {
             let attributes_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
             offset += 8;
 
-            if attributes_count > 0 {
-                //let attribute_name_index = 
-            }
-
+            let (attributes, new_offset) = Self::read_attributes(bytes, offset, attributes_count);
+            offset = new_offset;
             println!(">>>> a: {:X}, ni: {}, di: {}, ac: {}", access_flags, name_index, descriptor_index, attributes_count);
 
             i += 1;
@@ -161,7 +160,22 @@ impl<'c> RawClass<'c> {
         offset
     }
 
-    fn read_attributes() {
-        
+    fn read_attributes(bytes: &[u8], offset: usize, attribute_count: u16) -> (Vec<Attribute<'c>>, usize) {
+        let mut offset = offset;
+        let mut i = 0;
+        let mut attributes = Vec::with_capacity(attribute_count as usize);
+
+        while i < attribute_count {
+            let attribute_name_index = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+            let attribute_length = u32::from_be_bytes([bytes[offset + 2], bytes[offset + 3], bytes[offset + 4], bytes[offset + 5]]);
+            let constant_value_index = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
+            offset += 8;
+
+            println!("--------------- {} {} {}", attribute_name_index, attribute_length, constant_value_index);
+
+            i += 1;
+        }
+
+        (attributes, offset)
     }
 }
