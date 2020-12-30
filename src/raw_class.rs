@@ -10,11 +10,12 @@ use crate::constant_pool::{
 use crate::constant_pool::Constant;
 
 #[derive(Debug)]
-pub struct RawClass {
+pub struct RawClass<'c> {
     magic: u32,
     minor_version: u16,
     major_version: u16,
     constant_pool_count: u16,
+    constant_pool: Vec<Constant<'c>>,
 
     access_flags: u16,
     this_class: u16,
@@ -31,8 +32,8 @@ struct Field {
     attributes_count: u16
 }
 
-impl RawClass {
-    pub fn from_bytes(bytes: &[u8]) -> RawClass {
+impl<'c> RawClass<'c> {
+    pub fn from_bytes(bytes: &'c [u8]) -> RawClass<'c> {
         let magic = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         let minor_version = u16::from_be_bytes([bytes[4], bytes[5]]);
         let major_version = u16::from_be_bytes([bytes[6], bytes[7]]);
@@ -41,8 +42,40 @@ impl RawClass {
         let mut i = 1;
         let mut offset = 10;
 
-        while i < constant_pool_count {
+        let (constant_pool, mut offset) = Self::read_constant_pool(bytes, offset, constant_pool_count);
 
+        let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+        let this_class = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
+        let super_class = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
+        let interface_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
+
+        // TODO: if interface_count > 0, read interfaces
+
+        let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
+        offset += 10;
+
+        let _ = Self::read_fields(bytes, offset, field_count);
+
+        RawClass {
+            magic,
+            minor_version,
+            major_version,
+            constant_pool_count,
+            constant_pool,
+            access_flags,
+            this_class,
+            super_class,
+            interface_count,
+            field_count
+        }
+    }
+
+    fn read_constant_pool(bytes: &'c [u8], offset: usize, constant_pool_count: u16) -> (Vec<Constant<'c>>, usize) {
+        let mut offset = offset;
+        let mut i = 1;
+        let mut constant_pool = Vec::with_capacity(constant_pool_count as usize);
+
+        while i < constant_pool_count {
             let tag = bytes[offset];
 
             let constant = match tag {
@@ -97,31 +130,38 @@ impl RawClass {
                 }
                 _ => panic!("unknown constant tag {}", tag)
             };
-
-            println!("{:#?}", constant);
+        
+            constant_pool.push(constant);
             i += 1;
         }
 
-        let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
-        let this_class = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
-        let super_class = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
-        let interface_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
+        (constant_pool, offset)
+    }
 
-        // TODO: if interface_count > 0, read interfaces
+    fn read_fields(bytes: &[u8], offset: usize, field_count: u16) -> usize {
+        let mut offset = offset;
+        let mut i = 0;
 
-        let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
-        offset += 10;
+        while i < field_count {
+            let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+            let name_index = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
+            let descriptor_index = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
+            let attributes_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
+            offset += 8;
 
-        RawClass {
-            magic,
-            minor_version,
-            major_version,
-            constant_pool_count,
-            access_flags,
-            this_class,
-            super_class,
-            interface_count,
-            field_count
+            if attributes_count > 0 {
+                //let attribute_name_index = 
+            }
+
+            println!(">>>> a: {:X}, ni: {}, di: {}, ac: {}", access_flags, name_index, descriptor_index, attributes_count);
+
+            i += 1;
         }
+
+        offset
+    }
+
+    fn read_attributes() {
+        
     }
 }
