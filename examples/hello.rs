@@ -8,7 +8,7 @@ use std::{
 use classfmt::RawClass;
 
 fn main() -> io::Result<()> {
-    let mut f = File::open(Path::new("./tests/Hello.class"))?;
+    let mut f = File::open(Path::new("./tests/Fields.class"))?;
     let mut buf = Vec::with_capacity(64);
 
     f.read_to_end(&mut buf)?;

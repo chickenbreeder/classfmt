@@ -40,11 +40,11 @@ pub(crate) enum Constant<'c> {
     },
     Integer {
         tag: u8,
-        bytes: [u8; 4]
+        value: i32
     },
     Float {
         tag: u8,
-        bytes: [u8; 4]
+        bytes: &'c [u8]
     },
     Utf8 {
         tag: u8,

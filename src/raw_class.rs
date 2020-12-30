@@ -4,7 +4,8 @@ use crate::constant_pool::{
     CONST_STRING,
     CONST_CLASS,
     CONST_UTF8,
-    CONST_NAME_AND_TYPE
+    CONST_NAME_AND_TYPE,
+    CONST_INTEGER
 };
 use crate::constant_pool::Constant;
 
@@ -18,7 +19,16 @@ pub struct RawClass {
     access_flags: u16,
     this_class: u16,
     super_class: u16,
-    interface_count: u16
+    interface_count: u16,
+    // interfaces: Vec<u16>, <--- index into the constant pool table,
+    field_count: u16
+}
+
+struct Field {
+    access_flags: u16,
+    name_index: u16,
+    descriptor_index: u16,
+    attributes_count: u16
 }
 
 impl RawClass {
@@ -76,6 +86,14 @@ impl RawClass {
                     offset += 5;
 
                     Constant::NameAndType { tag, name_index, descriptor_index }
+                },
+                CONST_INTEGER => {
+                    
+                    let b = [bytes[offset + 1], bytes[offset + 2], bytes[offset + 3], bytes[offset + 4]];
+                    let value = i32::from_be_bytes(b);
+                    offset += 5;
+
+                    Constant::Integer { tag, value }
                 }
                 _ => panic!("unknown constant tag {}", tag)
             };
@@ -89,6 +107,11 @@ impl RawClass {
         let super_class = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
         let interface_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
 
+        // TODO: if interface_count > 0, read interfaces
+
+        let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
+        offset += 10;
+
         RawClass {
             magic,
             minor_version,
@@ -97,7 +120,8 @@ impl RawClass {
             access_flags,
             this_class,
             super_class,
-            interface_count
+            interface_count,
+            field_count
         }
     }
 }
