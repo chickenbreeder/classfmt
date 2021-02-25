@@ -13,7 +13,7 @@ fn main() -> io::Result<()> {
 
     f.read_to_end(&mut buf)?;
 
-    let class = RawClass::from_bytes(&buf);
+    let class = RawClass::from_bytes(&buf).unwrap();
     println!("{:#?}", class);
 
     Ok(())

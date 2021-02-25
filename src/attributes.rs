@@ -1,4 +1,5 @@
 
+#[derive(Debug)]
 pub(crate) struct ExceptionTableEntry {
     start_pc: u16,
     end_pc: u16,
@@ -6,15 +7,16 @@ pub(crate) struct ExceptionTableEntry {
     catch_type: u16
 }
 
+#[derive(Debug)]
 pub(crate) enum Attribute<'c> {
     ConstantValue {
         attribute_name_index: u16,
-        attribute_length: u16,
+        attribute_length: u32,
         constantvalue_index: u16
     },
     Code {
         attribute_name_index: u16,
-        attribute_length: u16,
+        attribute_length: u32,
         max_stack: u16,
         max_locals: u16,
         code_length: u32,

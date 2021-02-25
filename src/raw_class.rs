@@ -1,3 +1,5 @@
+use std::str;
+
 use crate::constant_pool::{
     CONST_METHODREF,
     CONST_FIELDREF,
@@ -9,6 +11,7 @@ use crate::constant_pool::{
 };
 use crate::constant_pool::Constant;
 use crate::attributes::Attribute;
+use crate::error::ErrorType;
 
 #[derive(Debug)]
 pub struct RawClass<'c> {
@@ -34,7 +37,7 @@ struct Field<'c> {
 }
 
 impl<'c> RawClass<'c> {
-    pub fn from_bytes(bytes: &'c [u8]) -> RawClass<'c> {
+    pub fn from_bytes(bytes: &'c [u8]) -> Result<RawClass<'c>, ErrorType> {
         let magic = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         let minor_version = u16::from_be_bytes([bytes[4], bytes[5]]);
         let major_version = u16::from_be_bytes([bytes[6], bytes[7]]);
@@ -55,9 +58,9 @@ impl<'c> RawClass<'c> {
         let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
         offset += 10;
 
-        let _ = Self::read_fields(bytes, offset, field_count);
+        let _ = Self::read_fields(bytes, offset, field_count, &constant_pool)?;
 
-        RawClass {
+        Ok(RawClass {
             magic,
             minor_version,
             major_version,
@@ -68,7 +71,7 @@ impl<'c> RawClass<'c> {
             super_class,
             interface_count,
             field_count
-        }
+        })
     }
 
     fn read_constant_pool(bytes: &'c [u8], offset: usize, constant_pool_count: u16) -> (Vec<Constant<'c>>, usize) {
@@ -131,7 +134,7 @@ impl<'c> RawClass<'c> {
                 }
                 _ => panic!("unknown constant tag {}", tag)
             };
-        
+
             constant_pool.push(constant);
             i += 1;
         }
@@ -139,7 +142,7 @@ impl<'c> RawClass<'c> {
         (constant_pool, offset)
     }
 
-    fn read_fields(bytes: &[u8], offset: usize, field_count: u16) -> usize {
+    fn read_fields(bytes: &[u8], offset: usize, field_count: u16, constant_pool: &[Constant]) -> Result<usize, ErrorType> {
         let mut offset = offset;
         let mut i = 0;
 
@@ -150,17 +153,16 @@ impl<'c> RawClass<'c> {
             let attributes_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
             offset += 8;
 
-            let (attributes, new_offset) = Self::read_attributes(bytes, offset, attributes_count);
+            let (attributes, new_offset) = Self::read_attributes(bytes, offset, attributes_count, constant_pool)?;
             offset = new_offset;
-            println!(">>>> a: {:X}, ni: {}, di: {}, ac: {}", access_flags, name_index, descriptor_index, attributes_count);
 
             i += 1;
         }
 
-        offset
+        Ok(offset)
     }
 
-    fn read_attributes(bytes: &[u8], offset: usize, attribute_count: u16) -> (Vec<Attribute<'c>>, usize) {
+    fn read_attributes(bytes: &[u8], offset: usize, attribute_count: u16, constant_pool: &[Constant]) -> Result<(Vec<Attribute<'c>>, usize), ErrorType> {
         let mut offset = offset;
         let mut i = 0;
         let mut attributes = Vec::with_capacity(attribute_count as usize);
@@ -168,14 +170,36 @@ impl<'c> RawClass<'c> {
         while i < attribute_count {
             let attribute_name_index = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
             let attribute_length = u32::from_be_bytes([bytes[offset + 2], bytes[offset + 3], bytes[offset + 4], bytes[offset + 5]]);
-            let constant_value_index = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
-            offset += 8;
+            offset += 6;
 
-            println!("--------------- {} {} {}", attribute_name_index, attribute_length, constant_value_index);
+            let cp_entry = &constant_pool[(attribute_name_index - 1) as usize];
+
+            match cp_entry {
+                &Constant::Utf8 {tag, length, bytes: s_bytes} => {
+                    let s = str::from_utf8(s_bytes)?;
+
+                    let attribute = match s {
+                        "ConstantValue" => {
+                            let constantvalue_index = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+                            offset += 2;
+
+                            Attribute::ConstantValue {
+                                attribute_name_index,
+                                attribute_length,
+                                constantvalue_index
+                            }
+                        },
+                        _ => unimplemented!()
+                    };
+
+                    attributes.push(attribute);
+                },
+                _ => return Err(ErrorType::InvalidNameIndex)
+            }
 
             i += 1;
         }
 
-        (attributes, offset)
+        Ok((attributes, offset))
     }
 }
