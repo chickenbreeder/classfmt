@@ -1,6 +1,6 @@
 [package]
 name = "classfmt"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["chickenbreeder <chickenbreeder@users.noreply.github.com>"]
 edition = "2018"
 description = "A library for parsing Java class files"

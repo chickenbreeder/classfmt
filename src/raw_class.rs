@@ -2,30 +2,23 @@ use std::str;
 use std::convert::TryFrom;
 
 use crate::constant_pool::{ConstantTag, Constant, ReferenceKind};
-use crate::attributes::Attribute;
+use crate::attribute::Attribute;
 use crate::error::ErrorType;
+use crate::field::Field;
 
 #[derive(Debug)]
 pub struct RawClass<'c> {
-    magic: u32,
-    minor_version: u16,
-    major_version: u16,
-    constant_pool_count: u16,
-    constant_pool: Vec<Constant<'c>>,
-    access_flags: u16,
-    this_class: u16,
-    super_class: u16,
-    interface_count: u16,
-    // interfaces: Vec<u16>, <--- index into the constant pool table,
-    field_count: u16
-}
-
-struct Field<'c> {
-    access_flags: u16,
-    name_index: u16,
-    descriptor_index: u16,
-    attributes_count: u16,
-    attributes: Vec<Attribute<'c>>
+    pub magic: u32,
+    pub minor_version: u16,
+    pub major_version: u16,
+    pub constant_pool_count: u16,
+    pub constant_pool: Vec<Constant<'c>>,
+    pub access_flags: u16,
+    pub this_class: u16,
+    pub super_class: u16,
+    pub interface_count: u16,
+    pub field_count: u16,
+    pub fields: Vec<Field<'c>>,
 }
 
 impl<'c> RawClass<'c> {
@@ -45,12 +38,10 @@ impl<'c> RawClass<'c> {
         let super_class = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
         let interface_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
 
-        // TODO: if interface_count > 0, read interfaces
-
         let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
         offset += 10;
 
-        let _ = Self::read_fields(bytes, offset, field_count, &constant_pool)?;
+        let (fields, _) = Self::read_fields(bytes, offset, field_count, &constant_pool)?;
 
         Ok(RawClass {
             magic,
@@ -62,7 +53,8 @@ impl<'c> RawClass<'c> {
             this_class,
             super_class,
             interface_count,
-            field_count
+            field_count,
+            fields
         })
     }
 
@@ -152,9 +144,10 @@ impl<'c> RawClass<'c> {
         Ok((constant_pool, offset))
     }
 
-    fn read_fields(bytes: &[u8], offset: usize, field_count: u16, constant_pool: &[Constant]) -> Result<usize, ErrorType> {
+    fn read_fields(bytes: &[u8], offset: usize, field_count: u16, constant_pool: &[Constant]) -> Result<(Vec<Field<'c>>, usize), ErrorType> {
         let mut offset = offset;
         let mut i = 0;
+        let mut fields = Vec::with_capacity(field_count as usize);
 
         while i < field_count {
             let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
@@ -166,10 +159,20 @@ impl<'c> RawClass<'c> {
             let (attributes, new_offset) = Self::read_attributes(bytes, offset, attributes_count, constant_pool)?;
             offset = new_offset;
 
+            let field = Field {
+                access_flags,
+                name_index,
+                descriptor_index,
+                attributes_count,
+                attributes
+            };
+
+            fields.push(field);
+
             i += 1;
         }
 
-        Ok(offset)
+        Ok((fields, offset))
     }
 
     fn read_attributes(bytes: &[u8], offset: usize, attribute_count: u16, constant_pool: &[Constant]) -> Result<(Vec<Attribute<'c>>, usize), ErrorType> {
@@ -211,5 +214,66 @@ impl<'c> RawClass<'c> {
         }
 
         Ok((attributes, offset))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        str,
+        fs::File,
+        path::Path,
+        io,
+        io::Read
+    };
+    use super::RawClass;
+    use crate::error::ErrorType;
+    use crate::attribute::Attribute;
+    use crate::constant_pool::{Constant, ConstantTag};
+
+    fn read_class_file(p: &str) -> Result<Vec<u8>, ErrorType> {
+        let mut f = File::open(Path::new(p)).unwrap();
+        let mut buf = Vec::with_capacity(64);
+    
+        f.read_to_end(&mut buf).unwrap();
+        Ok(buf)
+    }
+
+    #[test]
+    fn parse_fields() {
+        let buf = read_class_file("./tests/Fields.class").unwrap();
+        let class = RawClass::from_bytes(&buf).unwrap();
+
+        assert_eq!(class.field_count, 3);
+        let constant_pool = class.constant_pool;
+        let fields = class.fields;
+        let f0 = &fields[0];
+
+        let constant = &constant_pool[(f0.name_index - 1) as usize];
+
+        if let Constant::Utf8 { tag, length, bytes } = constant {
+            let s = str::from_utf8(bytes).unwrap();
+
+            assert_eq!(s, "test");
+            assert_eq!(f0.attributes_count, 1);
+            let attribute = &f0.attributes[0];
+
+            if let Attribute::ConstantValue { attribute_name_index, attribute_length, constantvalue_index } = attribute {
+                let constant = &constant_pool[(constantvalue_index - 1) as usize];
+
+                if let Constant::Integer {tag, value} = constant {
+                    assert_eq!(*value, 2147483647);
+                }
+                else {
+                    panic!("expected Constant::Integer, found {:?}", constant);
+                }
+            }
+            else {
+                panic!("expected Attribute::ConstantValue, found {:?}", attribute);
+            }
+        }
+        else {
+            panic!("expected Constant::Utf8, found {:?}", constant);
+        }
     }
 }

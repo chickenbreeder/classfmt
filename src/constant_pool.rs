@@ -78,7 +78,7 @@ impl TryFrom<u8> for ReferenceKind {
 }
 
 #[derive(Debug)]
-pub(crate) enum Constant<'c> {
+pub enum Constant<'c> {
     Class {
         tag: ConstantTag,
         name_index: u16

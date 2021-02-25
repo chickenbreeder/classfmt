@@ -1,6 +1,6 @@
 
 #[derive(Debug)]
-pub(crate) struct ExceptionTableEntry {
+pub struct ExceptionTableEntry {
     start_pc: u16,
     end_pc: u16,
     handler_pc: u16,
@@ -8,7 +8,7 @@ pub(crate) struct ExceptionTableEntry {
 }
 
 #[derive(Debug)]
-pub(crate) enum Attribute<'c> {
+pub enum Attribute<'c> {
     ConstantValue {
         attribute_name_index: u16,
         attribute_length: u32,
