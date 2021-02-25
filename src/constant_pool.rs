@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use crate::error::ErrorType;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ConstantTag {
     Class = 7,
@@ -18,6 +18,20 @@ pub enum ConstantTag {
     MethodHandle = 15,
     MethodType = 16,
     InvokeDynamic = 18
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ReferenceKind {
+    GetField = 1,
+    GetStatic = 2,
+    PutField = 3,
+    PutStatic = 4,
+    InvokeVirtual = 5,
+    InvokeStatic = 6,
+    InvokeSpecial = 7,
+    NewInvokeSpecial = 8,
+    InvokeInterface = 9
 }
 
 impl TryFrom<u8> for ConstantTag {
@@ -39,6 +53,25 @@ impl TryFrom<u8> for ConstantTag {
             x if x == ConstantTag::MethodHandle as u8 => Ok(ConstantTag::MethodHandle),
             x if x == ConstantTag::MethodType as u8 => Ok(ConstantTag::MethodType),
             x if x == ConstantTag::InvokeDynamic as u8 => Ok(ConstantTag::InvokeDynamic),
+            _ => Err(ErrorType::IntegerConversion)
+        }
+    }
+}
+
+impl TryFrom<u8> for ReferenceKind {
+    type Error = ErrorType;
+
+    fn try_from(v: u8) -> Result<ReferenceKind, Self::Error> {
+        match v {
+            x if x == ReferenceKind::GetField as u8 => Ok(ReferenceKind::GetField),
+            x if x == ReferenceKind::GetStatic as u8 => Ok(ReferenceKind::GetStatic),
+            x if x == ReferenceKind::PutField as u8 => Ok(ReferenceKind::PutField),
+            x if x == ReferenceKind::PutStatic as u8 => Ok(ReferenceKind::PutStatic),
+            x if x == ReferenceKind::InvokeVirtual as u8 => Ok(ReferenceKind::InvokeVirtual),
+            x if x == ReferenceKind::InvokeStatic as u8 => Ok(ReferenceKind::InvokeStatic),
+            x if x == ReferenceKind::InvokeSpecial as u8 => Ok(ReferenceKind::InvokeSpecial),
+            x if x == ReferenceKind::NewInvokeSpecial as u8 => Ok(ReferenceKind::NewInvokeSpecial),
+            x if x == ReferenceKind::InvokeInterface as u8 => Ok(ReferenceKind::InvokeInterface),
             _ => Err(ErrorType::IntegerConversion)
         }
     }
@@ -77,15 +110,24 @@ pub(crate) enum Constant<'c> {
         tag: ConstantTag,
         bytes: &'c [u8]
     },
+    NameAndType {
+        tag: ConstantTag,
+        name_index: u16,
+        descriptor_index: u16
+    },
     Utf8 {
         tag: ConstantTag,
         length: u16,
         bytes: &'c [u8]
     },
-    NameAndType {
+    MethodHandle {
         tag: ConstantTag,
+        reference_kind: ReferenceKind,
+        reference_index: u16
+    },
+    InvokeDynamic {
+        tag: ConstantTag,
+        bootstrap_method_attr_index: u16,
         name_index: u16,
-        descriptor_index: u16
     }
-    
 }

@@ -1,7 +1,7 @@
 use std::str;
 use std::convert::TryFrom;
 
-use crate::constant_pool::{ConstantTag, Constant};
+use crate::constant_pool::{ConstantTag, Constant, ReferenceKind};
 use crate::attributes::Attribute;
 use crate::error::ErrorType;
 
@@ -123,7 +123,25 @@ impl<'c> RawClass<'c> {
                     offset += 5;
 
                     Constant::Integer { tag, value }
-                }
+                },
+                ConstantTag::MethodHandle => {
+                    let reference_kind = ReferenceKind::try_from(bytes[offset + 1])?;
+                    let reference_index = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
+                    offset += 4;
+
+                    Constant::MethodHandle { tag, reference_kind, reference_index }
+                },
+                ConstantTag::InvokeDynamic => {
+                    let bootstrap_method_attr_index = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
+                    let name_index = u16::from_be_bytes([bytes[offset + 3], bytes[offset + 4]]);
+                    offset += 5;
+
+                    Constant::InvokeDynamic {
+                        tag,
+                        bootstrap_method_attr_index,
+                        name_index
+                    }
+                },
                 _ => panic!("unknown constant tag {}", tag as u8)
             };
 

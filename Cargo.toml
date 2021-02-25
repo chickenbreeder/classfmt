@@ -3,6 +3,12 @@ name = "classfmt"
 version = "0.1.0"
 authors = ["chickenbreeder <chickenbreeder@users.noreply.github.com>"]
 edition = "2018"
+description = "Java class file parser"
+license = "Apache-2.0"
+exclude = [
+    "Makefile",
+    "**/*.java"
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
