@@ -1,15 +1,7 @@
 use std::str;
+use std::convert::TryFrom;
 
-use crate::constant_pool::{
-    CONST_METHODREF,
-    CONST_FIELDREF,
-    CONST_STRING,
-    CONST_CLASS,
-    CONST_UTF8,
-    CONST_NAME_AND_TYPE,
-    CONST_INTEGER
-};
-use crate::constant_pool::Constant;
+use crate::constant_pool::{ConstantTag, Constant};
 use crate::attributes::Attribute;
 use crate::error::ErrorType;
 
@@ -46,7 +38,7 @@ impl<'c> RawClass<'c> {
         let mut i = 1;
         let mut offset = 10;
 
-        let (constant_pool, mut offset) = Self::read_constant_pool(bytes, offset, constant_pool_count);
+        let (constant_pool, mut offset) = Self::read_constant_pool(bytes, offset, constant_pool_count)?;
 
         let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
         let this_class = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
@@ -74,42 +66,42 @@ impl<'c> RawClass<'c> {
         })
     }
 
-    fn read_constant_pool(bytes: &'c [u8], offset: usize, constant_pool_count: u16) -> (Vec<Constant<'c>>, usize) {
+    fn read_constant_pool(bytes: &'c [u8], offset: usize, constant_pool_count: u16) -> Result<(Vec<Constant<'c>>, usize), ErrorType> {
         let mut offset = offset;
         let mut i = 1;
         let mut constant_pool = Vec::with_capacity(constant_pool_count as usize);
 
         while i < constant_pool_count {
-            let tag = bytes[offset];
+            let tag = ConstantTag::try_from(bytes[offset])?;
 
             let constant = match tag {
-                CONST_METHODREF => {
+                ConstantTag::Methodref => {
                     let class_index = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
                     let name_and_type_index = u16::from_be_bytes([bytes[offset + 3], bytes[offset + 4]]);
                     offset += 5;
 
                     Constant::Methodref { tag, class_index, name_and_type_index }
                 },
-                CONST_FIELDREF => {
+                ConstantTag::Fieldref => {
                     let class_index = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
                     let name_and_type_index = u16::from_be_bytes([bytes[offset + 3], bytes[offset + 4]]);
                     offset += 5;
 
                     Constant::Fieldref { tag, class_index, name_and_type_index }
                 },
-                CONST_STRING => {
+                ConstantTag::String => {
                     let string_index = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
                     offset += 3;
 
                     Constant::String { tag, string_index }
                 },
-                CONST_CLASS => {
+                ConstantTag::Class => {
                     let name_index = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
                     offset += 3;
 
                     Constant::Class { tag, name_index }
                 },
-                CONST_UTF8 => {
+                ConstantTag::Utf8 => {
                     let length = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
                     let end = offset + 3 + length as usize;
                     let bytes = &bytes[offset + 3 .. end];
@@ -117,14 +109,14 @@ impl<'c> RawClass<'c> {
 
                     Constant::Utf8 { tag, length, bytes }
                 },
-                CONST_NAME_AND_TYPE => {
+                ConstantTag::NameAndType => {
                     let name_index = u16::from_be_bytes([bytes[offset + 1], bytes[offset + 2]]);
                     let descriptor_index = u16::from_be_bytes([bytes[offset + 3], bytes[offset + 4]]);
                     offset += 5;
 
                     Constant::NameAndType { tag, name_index, descriptor_index }
                 },
-                CONST_INTEGER => {
+                ConstantTag::Integer => {
                     
                     let b = [bytes[offset + 1], bytes[offset + 2], bytes[offset + 3], bytes[offset + 4]];
                     let value = i32::from_be_bytes(b);
@@ -132,14 +124,14 @@ impl<'c> RawClass<'c> {
 
                     Constant::Integer { tag, value }
                 }
-                _ => panic!("unknown constant tag {}", tag)
+                _ => panic!("unknown constant tag {}", tag as u8)
             };
 
             constant_pool.push(constant);
             i += 1;
         }
 
-        (constant_pool, offset)
+        Ok((constant_pool, offset))
     }
 
     fn read_fields(bytes: &[u8], offset: usize, field_count: u16, constant_pool: &[Constant]) -> Result<usize, ErrorType> {

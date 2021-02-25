@@ -3,7 +3,8 @@ use std::str::Utf8Error;
 #[derive(Debug)]
 pub enum ErrorType {
     InvalidNameIndex,
-    Utf8Error(Utf8Error)
+    Utf8Error(Utf8Error),
+    IntegerConversion,
 }
 
 impl From<Utf8Error> for ErrorType {
