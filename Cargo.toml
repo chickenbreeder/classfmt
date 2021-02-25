@@ -3,8 +3,9 @@ name = "classfmt"
 version = "0.1.0"
 authors = ["chickenbreeder <chickenbreeder@users.noreply.github.com>"]
 edition = "2018"
-description = "Java class file parser"
+description = "A library for parsing Java class files"
 license = "Apache-2.0"
+readme = "README.md"
 exclude = [
     "Makefile",
     "**/*.java"
