@@ -110,6 +110,16 @@ pub enum Constant<'c> {
         tag: ConstantTag,
         bytes: &'c [u8]
     },
+    Long {
+        tag: ConstantTag,
+        high_bytes: u32,
+        low_bytes: u32
+    },
+    Double {
+        tag: ConstantTag,
+        high_bytes: u32,
+        low_bytes: u32
+    },
     NameAndType {
         tag: ConstantTag,
         name_index: u16,
@@ -124,6 +134,10 @@ pub enum Constant<'c> {
         tag: ConstantTag,
         reference_kind: ReferenceKind,
         reference_index: u16
+    },
+    MethodType {
+        tag: ConstantTag,
+        descriptor_index: u16
     },
     InvokeDynamic {
         tag: ConstantTag,

@@ -28,16 +28,13 @@ impl<'c> RawClass<'c> {
         let major_version = u16::from_be_bytes([bytes[6], bytes[7]]);
         let constant_pool_count = u16::from_be_bytes([bytes[8], bytes[9]]);
 
-        let mut i = 1;
-        let mut offset = 10;
-
+        let offset = 10;
         let (constant_pool, mut offset) = Self::read_constant_pool(bytes, offset, constant_pool_count)?;
 
         let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
         let this_class = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
         let super_class = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
         let interface_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
-
         let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
         offset += 10;
 
