@@ -5,6 +5,7 @@ use crate::constant_pool::{ConstantTag, Constant, ReferenceKind};
 use crate::attribute::Attribute;
 use crate::error::ErrorType;
 use crate::field::Field;
+use crate::method::Method;
 
 #[derive(Debug)]
 pub struct RawClass<'c> {
@@ -19,6 +20,8 @@ pub struct RawClass<'c> {
     pub interface_count: u16,
     pub field_count: u16,
     pub fields: Vec<Field<'c>>,
+    pub methods_count: u16,
+    pub methods: Vec<Method<'c>>
 }
 
 impl<'c> RawClass<'c> {
@@ -38,7 +41,12 @@ impl<'c> RawClass<'c> {
         let field_count = u16::from_be_bytes([bytes[offset + 8], bytes[offset + 9]]);
         offset += 10;
 
-        let (fields, _) = Self::read_fields(bytes, offset, field_count, &constant_pool)?;
+        let (fields, mut offset) = Self::read_fields(bytes, offset, field_count, &constant_pool)?;
+
+        let methods_count = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+        offset += 2;
+
+        let (methods, _) = Self::read_methods(bytes, offset, methods_count, &constant_pool)?;
 
         Ok(RawClass {
             magic,
@@ -51,7 +59,9 @@ impl<'c> RawClass<'c> {
             super_class,
             interface_count,
             field_count,
-            fields
+            fields,
+            methods_count,
+            methods
         })
     }
 
@@ -172,6 +182,37 @@ impl<'c> RawClass<'c> {
         Ok((fields, offset))
     }
 
+    fn read_methods(bytes: &[u8], offset: usize, method_count: u16, constant_pool: &[Constant]) -> Result<(Vec<Method<'c>>, usize), ErrorType> {
+        let mut offset = offset;
+        let mut i = 0;
+        let mut methods = Vec::with_capacity(method_count as usize);
+        
+        while i < method_count {
+            let access_flags = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+            let name_index = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
+            let descriptor_index = u16::from_be_bytes([bytes[offset + 4], bytes[offset + 5]]);
+            let attributes_count = u16::from_be_bytes([bytes[offset + 6], bytes[offset + 7]]);
+            offset += 8;
+
+            let (attributes, new_offset) = Self::read_attributes(bytes, offset, attributes_count, constant_pool)?;
+            offset = new_offset;
+
+            let method = Method {
+                access_flags,
+                name_index,
+                descriptor_index,
+                attributes_count,
+                attributes
+            };
+
+            methods.push(method);
+
+            i += 1;
+        }
+
+        Ok((methods, offset))
+    }
+
     fn read_attributes(bytes: &[u8], offset: usize, attribute_count: u16, constant_pool: &[Constant]) -> Result<(Vec<Attribute<'c>>, usize), ErrorType> {
         let mut offset = offset;
         let mut i = 0;
@@ -199,7 +240,16 @@ impl<'c> RawClass<'c> {
                                 constantvalue_index
                             }
                         },
-                        _ => unimplemented!()
+                        "Code" => {
+                            let max_stack = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]);
+                            let max_locals = u16::from_be_bytes([bytes[offset + 2], bytes[offset + 3]]);
+                            let code_length = u32::from_be_bytes([bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]]);
+                            offset += 8;
+
+                            Self::read_code(bytes, offset, code_length);
+                            unimplemented!()
+                        },
+                        _ => panic!("unknown tag: `{}`", s)
                     };
 
                     attributes.push(attribute);
@@ -211,6 +261,10 @@ impl<'c> RawClass<'c> {
         }
 
         Ok((attributes, offset))
+    }
+
+    fn read_code(bytes: &[u8], offset: usize, code_length: u32) {
+        
     }
 }
 
