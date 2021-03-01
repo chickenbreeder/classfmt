@@ -12,3 +12,4 @@ pub use constant_pool::{Constant, ConstantTag, ReferenceKind};
 pub use field::Field;
 pub use attribute::Attribute;
 pub use method::Method;
+pub use opcode::Opcode;
