@@ -5,7 +5,7 @@ use std::{
     io::Read
 };
 
-use classfmt::RawClass;
+use classfmt::parser::ClassParser;
 
 fn main() -> io::Result<()> {
     let mut f = File::open(Path::new("./tests/Fields.class"))?;
@@ -13,7 +13,8 @@ fn main() -> io::Result<()> {
 
     f.read_to_end(&mut buf)?;
 
-    let class = RawClass::from_bytes(&buf).unwrap();
+    let mut parser = ClassParser::from_bytes(&buf);
+    let class = parser.parse().unwrap();
     println!("{:#?}", class);
 
     Ok(())

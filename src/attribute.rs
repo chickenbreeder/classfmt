@@ -2,16 +2,16 @@ use crate::opcode::Opcode;
 
 #[derive(Debug)]
 pub struct ExceptionTableEntry {
-    start_pc: u16,
-    end_pc: u16,
-    handler_pc: u16,
-    catch_type: u16
+    pub start_pc: u16,
+    pub end_pc: u16,
+    pub handler_pc: u16,
+    pub catch_type: u16
 }
 
 #[derive(Debug)]
 pub struct LineNumberTableEntry {
-    start_pc: u16,
-    line_number: u16
+    pub start_pc: u16,
+    pub line_number: u16
 }
 
 #[derive(Debug)]

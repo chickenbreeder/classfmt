@@ -14,3 +14,4 @@ pub use field::Field;
 pub use attribute::Attribute;
 pub use method::Method;
 pub use opcode::Opcode;
+pub use parser::ClassParser;
