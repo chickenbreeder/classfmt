@@ -6,6 +6,7 @@ pub mod error;
 pub mod field;
 pub mod method;
 pub mod opcode;
+pub mod parser;
 
 pub use raw_class::RawClass;
 pub use constant_pool::{Constant, ConstantTag, ReferenceKind};
