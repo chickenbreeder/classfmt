@@ -3,7 +3,7 @@ use std::str;
 
 use crate::error::ErrorType;
 use crate::{Constant, ConstantTag, ReferenceKind, Attribute, Opcode, Method, Field, RawClass};
-use crate::attribute::LineNumberTableEntry;
+use crate::attribute::{LineNumberTableEntry, ExceptionTableEntry};
 
 pub struct ClassParser<'c> {
     bytes: &'c [u8],
@@ -212,7 +212,7 @@ impl<'c> ClassParser<'c> {
             let cp_entry = &constant_pool[(attribute_name_index - 1) as usize];
 
             match cp_entry {
-                &Constant::Utf8 {tag, length, bytes: s_bytes} => {
+                &Constant::Utf8 {tag: _, length: _, bytes: s_bytes} => {
                     let s = str::from_utf8(s_bytes)?;
 
                     let attribute = match s {
@@ -245,10 +245,29 @@ impl<'c> ClassParser<'c> {
         let max_stack = self.read_u16_be();
         let max_locals = self.read_u16_be();
         let code_length = self.read_u32_be();
-
         let code = self.read_opcodes(code_length)?;
-        
+
         let exception_table_length = self.read_u16_be();
+        let mut exception_table = Vec::with_capacity(exception_table_length as usize);
+        let mut i = 0;
+
+        while i < exception_table_length {
+            let start_pc = self.read_u16_be();
+            let end_pc = self.read_u16_be();
+            let handler_pc = self.read_u16_be();
+            let catch_type = self.read_u16_be();
+
+            let entry = ExceptionTableEntry {
+                start_pc,
+                end_pc,
+                handler_pc,
+                catch_type
+            };
+
+            exception_table.push(entry);
+            i += 1;
+        }
+
         let attributes_count = self.read_u16_be();
 
         let attributes = self.read_attributes(attributes_count, constant_pool)?;
@@ -261,7 +280,7 @@ impl<'c> ClassParser<'c> {
             code_length,
             code,
             exception_table_length,
-            exception_table: vec![], // TODO: Parse exception table
+            exception_table,
             attributes_count,
             attributes
         })
@@ -282,7 +301,6 @@ impl<'c> ClassParser<'c> {
             };
 
             line_number_table.push(entry);
-
             i += 1;
         }
 
@@ -316,13 +334,12 @@ mod test {
         str,
         fs::File,
         path::Path,
-        io,
         io::Read
     };
     use super::ClassParser;
     use crate::error::ErrorType;
     use crate::attribute::Attribute;
-    use crate::constant_pool::{Constant, ConstantTag};
+    use crate::constant_pool::Constant;
 
     fn read_class_file(p: &str) -> Result<Vec<u8>, ErrorType> {
         let mut f = File::open(Path::new(p)).unwrap();
@@ -345,17 +362,17 @@ mod test {
 
         let constant = &constant_pool[(f0.name_index - 1) as usize];
 
-        if let Constant::Utf8 { tag, length, bytes } = constant {
+        if let Constant::Utf8 { tag: _, length: _, bytes } = constant {
             let s = str::from_utf8(bytes).unwrap();
 
             assert_eq!(s, "test");
             assert_eq!(f0.attributes_count, 1);
             let attribute = &f0.attributes[0];
 
-            if let Attribute::ConstantValue { attribute_name_index, attribute_length, constantvalue_index } = attribute {
+            if let Attribute::ConstantValue { attribute_name_index: _, attribute_length: _, constantvalue_index } = attribute {
                 let constant = &constant_pool[(constantvalue_index - 1) as usize];
 
-                if let Constant::Integer {tag, value} = constant {
+                if let Constant::Integer {tag: _, value} = constant {
                     assert_eq!(*value, 2147483647);
                 }
                 else {
