@@ -330,12 +330,7 @@ impl<'c> ClassParser<'c> {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        str,
-        fs::File,
-        path::Path,
-        io::Read
-    };
+    use std::{fs::File, io::Read, path::Path, str};
     use super::ClassParser;
     use crate::error::ErrorType;
     use crate::attribute::Attribute;
@@ -347,6 +342,45 @@ mod test {
     
         f.read_to_end(&mut buf).unwrap();
         Ok(buf)
+    }
+
+    #[test]
+    fn parse_simple() {
+        let buf = read_class_file("./tests/Hello.class").unwrap();
+        let mut parser = ClassParser::from_bytes(&buf);
+        let class = parser.parse().unwrap();
+
+        assert_eq!(class.magic, 0xCAFEBABE);
+        assert_eq!(class.methods_count, 2);
+        assert_eq!(class.field_count, 0);
+
+        let constant_pool = class.constant_pool;
+
+        if let Constant::Class{tag: _, name_index} = &constant_pool[(class.this_class - 1) as usize] {
+            if let Constant::Utf8{tag: _, length: _, bytes} = &constant_pool[(name_index - 1) as usize] {
+                let s = str::from_utf8(bytes).unwrap();
+                assert_eq!(s, "Hello");
+            }
+            else {
+                panic!("expected Constant::Utf8");
+            }
+        }
+        else {
+            panic!("expected Constant::Class");
+        }
+
+        if let Constant::Class{tag: _, name_index} = &constant_pool[(class.super_class - 1) as usize] {
+            if let Constant::Utf8{tag: _, length: _, bytes} = &constant_pool[(name_index - 1) as usize] {
+                let s = str::from_utf8(bytes).unwrap();
+                assert_eq!(s, "java/lang/Object");
+            }
+            else {
+                panic!("expected Constant::Utf8");
+            }
+        }
+        else {
+            panic!("expected Constant::Class");
+        }
     }
 
     #[test]
