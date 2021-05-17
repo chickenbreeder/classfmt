@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate bitflags;
+
 pub mod access_flags;
 pub mod attribute;
 pub mod constant_pool;

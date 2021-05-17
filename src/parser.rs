@@ -5,6 +5,7 @@ use crate::attribute::{ExceptionTableEntry, LineNumberTableEntry};
 use crate::error::ErrorType;
 use crate::{Attribute, Constant, ConstantTag, Field, Method, Opcode, RawClass, ReferenceKind};
 
+use crate::access_flags::{ClassAccessFlag, FieldAccessFlag, MethodAccessFlag};
 use crate::opcode::Instruction;
 
 pub struct ClassParser<'c> {
@@ -17,13 +18,13 @@ impl<'c> ClassParser<'c> {
         ClassParser { bytes, offset: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<RawClass, ErrorType> {
+    pub fn parse(&mut self) -> Result<RawClass<'c>, ErrorType> {
         let magic = self.read_u32_be();
         let minor_version = self.read_u16_be();
         let major_version = self.read_u16_be();
         let constant_pool_count = self.read_u16_be();
         let constant_pool = self.read_constant_pool(constant_pool_count)?;
-        let access_flags = self.read_u16_be();
+        let access_flags = ClassAccessFlag::from_bits(self.read_u16_be()).unwrap();
         let this_class = self.read_u16_be();
         let super_class = self.read_u16_be();
         let interface_count = self.read_u16_be();
@@ -182,7 +183,7 @@ impl<'c> ClassParser<'c> {
         let mut fields = Vec::with_capacity(field_count as usize);
 
         while i < field_count {
-            let access_flags = self.read_u16_be();
+            let access_flags = FieldAccessFlag::from_bits(self.read_u16_be()).unwrap();
             let name_index = self.read_u16_be();
             let descriptor_index = self.read_u16_be();
             let attributes_count = self.read_u16_be();
@@ -214,7 +215,7 @@ impl<'c> ClassParser<'c> {
         let mut methods = Vec::with_capacity(method_count as usize);
 
         while i < method_count {
-            let access_flags = self.read_u16_be();
+            let access_flags = MethodAccessFlag::from_bits(self.read_u16_be()).unwrap();
             let name_index = self.read_u16_be();
             let descriptor_index = self.read_u16_be();
             let attributes_count = self.read_u16_be();
