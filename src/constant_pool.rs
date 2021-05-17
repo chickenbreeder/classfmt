@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
 use crate::error::ErrorType;
+use std::convert::TryFrom;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
@@ -142,6 +142,6 @@ pub enum Constant<'c> {
     InvokeDynamic {
         tag: ConstantTag,
         bootstrap_method_attr_index: u16,
-        name_index: u16,
+        name_index: u16
     }
 }

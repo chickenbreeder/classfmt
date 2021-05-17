@@ -4,7 +4,7 @@ use std::str::Utf8Error;
 pub enum ErrorType {
     InvalidNameIndex,
     Utf8Error(Utf8Error),
-    IntegerConversion,
+    IntegerConversion
 }
 
 impl From<Utf8Error> for ErrorType {

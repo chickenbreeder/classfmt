@@ -1,9 +1,11 @@
 use std::convert::TryFrom;
 use std::str;
 
+use crate::attribute::{ExceptionTableEntry, LineNumberTableEntry};
 use crate::error::ErrorType;
-use crate::{Constant, ConstantTag, ReferenceKind, Attribute, Opcode, Method, Field, RawClass};
-use crate::attribute::{LineNumberTableEntry, ExceptionTableEntry};
+use crate::{Attribute, Constant, ConstantTag, Field, Method, Opcode, RawClass, ReferenceKind};
+
+use crate::opcode::Instruction;
 
 pub struct ClassParser<'c> {
     bytes: &'c [u8],
@@ -12,10 +14,7 @@ pub struct ClassParser<'c> {
 
 impl<'c> ClassParser<'c> {
     pub fn from_bytes(bytes: &'c [u8]) -> ClassParser<'c> {
-        ClassParser {
-            bytes,
-            offset: 0
-        }
+        ClassParser { bytes, offset: 0 }
     }
 
     pub fn parse(&mut self) -> Result<RawClass, ErrorType> {
@@ -46,20 +45,30 @@ impl<'c> ClassParser<'c> {
             field_count,
             fields,
             methods_count,
-            methods,
+            methods
         })
     }
 
     fn read_u32_be(&mut self) -> u32 {
         let off = self.offset;
         self.offset += 4;
-        u32::from_be_bytes([self.bytes[off], self.bytes[off + 1], self.bytes[off + 2], self.bytes[off + 3]])
+        u32::from_be_bytes([
+            self.bytes[off],
+            self.bytes[off + 1],
+            self.bytes[off + 2],
+            self.bytes[off + 3]
+        ])
     }
 
     fn read_i32_be(&mut self) -> i32 {
         let off = self.offset;
         self.offset += 4;
-        i32::from_be_bytes([self.bytes[off], self.bytes[off + 1], self.bytes[off + 2], self.bytes[off + 3]])
+        i32::from_be_bytes([
+            self.bytes[off],
+            self.bytes[off + 1],
+            self.bytes[off + 2],
+            self.bytes[off + 3]
+        ])
     }
 
     fn read_u16_be(&mut self) -> u16 {
@@ -68,7 +77,10 @@ impl<'c> ClassParser<'c> {
         u16::from_be_bytes([self.bytes[off], self.bytes[off + 1]])
     }
 
-    fn read_constant_pool(&mut self, constant_pool_count: u16) -> Result<Vec<Constant<'c>>, ErrorType> {
+    fn read_constant_pool(
+        &mut self,
+        constant_pool_count: u16
+    ) -> Result<Vec<Constant<'c>>, ErrorType> {
         let mut i = 1;
         let mut constant_pool = Vec::with_capacity(constant_pool_count as usize);
 
@@ -81,50 +93,66 @@ impl<'c> ClassParser<'c> {
                     let class_index = self.read_u16_be();
                     let name_and_type_index = self.read_u16_be();
 
-                    Constant::Methodref { tag, class_index, name_and_type_index }
-                },
+                    Constant::Methodref {
+                        tag,
+                        class_index,
+                        name_and_type_index
+                    }
+                }
                 ConstantTag::Fieldref => {
                     let class_index = self.read_u16_be();
                     let name_and_type_index = self.read_u16_be();
 
-                    Constant::Fieldref { tag, class_index, name_and_type_index }
-                },
+                    Constant::Fieldref {
+                        tag,
+                        class_index,
+                        name_and_type_index
+                    }
+                }
                 ConstantTag::String => {
                     let string_index = self.read_u16_be();
 
                     Constant::String { tag, string_index }
-                },
+                }
                 ConstantTag::Class => {
                     let name_index = self.read_u16_be();
 
                     Constant::Class { tag, name_index }
-                },
+                }
                 ConstantTag::Utf8 => {
                     let length = self.read_u16_be();
                     let end = self.offset + length as usize;
-                    let bytes = &self.bytes[self.offset .. end];
+                    let bytes = &self.bytes[self.offset..end];
                     self.offset += length as usize;
 
                     Constant::Utf8 { tag, length, bytes }
-                },
+                }
                 ConstantTag::NameAndType => {
                     let name_index = self.read_u16_be();
                     let descriptor_index = self.read_u16_be();
 
-                    Constant::NameAndType { tag, name_index, descriptor_index }
-                },
+                    Constant::NameAndType {
+                        tag,
+                        name_index,
+                        descriptor_index
+                    }
+                }
                 ConstantTag::Integer => {
                     let value = self.read_i32_be();
 
                     Constant::Integer { tag, value }
-                },
+                }
                 ConstantTag::MethodHandle => {
                     let reference_kind = ReferenceKind::try_from(self.bytes[self.offset])?;
                     self.offset += 1;
                     let reference_index = self.read_u16_be();
 
-                    Constant::MethodHandle { tag, reference_kind, reference_index }
-                },
+                    Constant::MethodHandle {
+                        tag,
+                        reference_kind,
+                        reference_index
+                    }
+                }
                 ConstantTag::InvokeDynamic => {
                     let bootstrap_method_attr_index = self.read_u16_be();
                     let name_index = self.read_u16_be();
@@ -134,8 +162,8 @@ impl<'c> ClassParser<'c> {
                         bootstrap_method_attr_index,
                         name_index
                     }
-                },
-                _ => panic!("unknown constant tag {}", tag as u8)
+                }
+                _ => unimplemented!("Unsupported constant tag {:?}", tag)
             };
 
             constant_pool.push(constant);
@@ -145,7 +173,11 @@ impl<'c> ClassParser<'c> {
         Ok(constant_pool)
     }
 
-    fn read_fields(&mut self, field_count: u16, constant_pool: &[Constant]) -> Result<Vec<Field>, ErrorType> {
+    fn read_fields(
+        &mut self,
+        field_count: u16,
+        constant_pool: &[Constant]
+    ) -> Result<Vec<Field>, ErrorType> {
         let mut i = 0;
         let mut fields = Vec::with_capacity(field_count as usize);
 
@@ -173,10 +205,14 @@ impl<'c> ClassParser<'c> {
         Ok(fields)
     }
 
-    fn read_methods(&mut self, method_count: u16, constant_pool: &[Constant]) -> Result<Vec<Method>, ErrorType> {
+    fn read_methods(
+        &mut self,
+        method_count: u16,
+        constant_pool: &[Constant]
+    ) -> Result<Vec<Method>, ErrorType> {
         let mut i = 0;
         let mut methods = Vec::with_capacity(method_count as usize);
-        
+
         while i < method_count {
             let access_flags = self.read_u16_be();
             let name_index = self.read_u16_be();
@@ -201,7 +237,11 @@ impl<'c> ClassParser<'c> {
         Ok(methods)
     }
 
-    fn read_attributes(&mut self, attribute_count: u16, constant_pool: &[Constant]) -> Result<Vec<Attribute>, ErrorType> {
+    fn read_attributes(
+        &mut self,
+        attribute_count: u16,
+        constant_pool: &[Constant]
+    ) -> Result<Vec<Attribute>, ErrorType> {
         let mut i = 0;
         let mut attributes = Vec::with_capacity(attribute_count as usize);
 
@@ -209,30 +249,37 @@ impl<'c> ClassParser<'c> {
             let attribute_name_index = self.read_u16_be();
             let attribute_length = self.read_u32_be();
 
-            let cp_entry = &constant_pool[(attribute_name_index - 1) as usize];
+            if let Constant::Utf8 {
+                tag: _,
+                length: _,
+                bytes
+            } = &constant_pool[(attribute_name_index - 1) as usize]
+            {
+                let s = str::from_utf8(bytes)?;
 
-            match cp_entry {
-                &Constant::Utf8 {tag: _, length: _, bytes: s_bytes} => {
-                    let s = str::from_utf8(s_bytes)?;
+                let attribute = match s {
+                    "ConstantValue" => {
+                        let constantvalue_index = self.read_u16_be();
 
-                    let attribute = match s {
-                        "ConstantValue" => {
-                            let constantvalue_index = self.read_u16_be();
+                        Attribute::ConstantValue {
+                            attribute_name_index,
+                            attribute_length,
+                            constantvalue_index
+                        }
+                    }
+                    "Code" => self.read_code_attribute(
+                        attribute_name_index,
+                        attribute_length,
+                        constant_pool
+                    )?,
+                    "LineNumberTable" => self
+                        .read_line_number_table_attribute(attribute_name_index, attribute_length)?,
+                    _ => panic!("unknown tag: `{}`", s)
+                };
 
-                            Attribute::ConstantValue {
-                                attribute_name_index,
-                                attribute_length,
-                                constantvalue_index
-                            }
-                        },
-                        "Code" => self.read_code_attribute(attribute_name_index, attribute_length, constant_pool)?,
-                        "LineNumberTable" => self.read_line_number_table_attribute(attribute_name_index, attribute_length)?,
-                        _ => panic!("unknown tag: `{}`", s)
-                    };
-
-                    attributes.push(attribute);
-                },
-                _ => return Err(ErrorType::InvalidNameIndex)
+                attributes.push(attribute);
+            } else {
+                return Err(ErrorType::InvalidNameIndex);
             }
 
             i += 1;
@@ -241,11 +288,17 @@ impl<'c> ClassParser<'c> {
         Ok(attributes)
     }
 
-    fn read_code_attribute(&mut self, attribute_name_index: u16, attribute_length: u32, constant_pool: &[Constant]) -> Result<Attribute, ErrorType> {
+    fn read_code_attribute(
+        &mut self,
+        attribute_name_index: u16,
+        attribute_length: u32,
+        constant_pool: &[Constant]
+    ) -> Result<Attribute, ErrorType> {
         let max_stack = self.read_u16_be();
         let max_locals = self.read_u16_be();
         let code_length = self.read_u32_be();
-        let code = self.read_opcodes(code_length)?;
+        let (offset, code) = self.read_instructions(code_length)?;
+        self.offset = offset;
 
         let exception_table_length = self.read_u16_be();
         let mut exception_table = Vec::with_capacity(exception_table_length as usize);
@@ -269,7 +322,6 @@ impl<'c> ClassParser<'c> {
         }
 
         let attributes_count = self.read_u16_be();
-
         let attributes = self.read_attributes(attributes_count, constant_pool)?;
 
         Ok(Attribute::Code {
@@ -286,7 +338,11 @@ impl<'c> ClassParser<'c> {
         })
     }
 
-    fn read_line_number_table_attribute(&mut self, attribute_name_index: u16, attribute_length: u32) -> Result<Attribute, ErrorType> {
+    fn read_line_number_table_attribute(
+        &mut self,
+        attribute_name_index: u16,
+        attribute_length: u32
+    ) -> Result<Attribute, ErrorType> {
         let line_number_table_length = self.read_u16_be();
         let mut i = 0;
         let mut line_number_table = Vec::with_capacity(line_number_table_length as usize);
@@ -308,38 +364,82 @@ impl<'c> ClassParser<'c> {
             attribute_name_index,
             attribute_length,
             line_number_table_length,
-            line_number_table,
+            line_number_table
         })
     }
 
-    fn read_opcodes(&mut self, code_length: u32) -> Result<Vec<Opcode>, ErrorType> {
-        let mut i = 0;
-        let mut opcodes = Vec::with_capacity(code_length as usize);
+    fn read_instructions(
+        &mut self,
+        code_length: u32
+    ) -> Result<(usize, Vec<Instruction>), ErrorType> {
+        let mut offset = self.offset;
+        let mut instructions = Vec::with_capacity(code_length as usize);
 
-        while i < code_length {
-            let opcode = Opcode::try_from(self.bytes[self.offset])?;
-            self.offset += 1;
-            opcodes.push(opcode);
+        while offset < self.offset + code_length as usize {
+            let opcode = Opcode::try_from(self.bytes[offset])?;
+            offset += 1;
 
-            i += 1;
+            let ins = match opcode {
+                Opcode::aload_0 => Instruction::aload_0,
+                Opcode::r#eturn => Instruction::r#eturn,
+                Opcode::invokespecial => {
+                    let indexbyte1 = self.bytes[offset];
+                    let indexbyte2 = self.bytes[offset + 1];
+                    offset += 2;
+
+                    Instruction::invokespecial {
+                        indexbyte1,
+                        indexbyte2
+                    }
+                }
+                Opcode::invokevirtual => {
+                    let indexbyte1 = self.bytes[offset];
+                    let indexbyte2 = self.bytes[offset + 1];
+                    offset += 2;
+
+                    Instruction::invokevirtual {
+                        indexbyte1,
+                        indexbyte2
+                    }
+                }
+                Opcode::getstatic => {
+                    let indexbyte1 = self.bytes[offset];
+                    let indexbyte2 = self.bytes[offset + 1];
+                    offset += 2;
+
+                    Instruction::getstatic {
+                        indexbyte1,
+                        indexbyte2
+                    }
+                }
+                Opcode::ldc => {
+                    let index = self.bytes[offset];
+                    offset += 1;
+
+                    Instruction::ldc { index }
+                }
+                _ => unimplemented!("Unsupported opcode {:?}", opcode)
+            };
+
+            instructions.push(ins);
         }
 
-        Ok(opcodes)
+        Ok((offset, instructions))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::{fs::File, io::Read, path::Path, str};
     use super::ClassParser;
-    use crate::error::ErrorType;
     use crate::attribute::Attribute;
     use crate::constant_pool::Constant;
+    use crate::error::ErrorType;
+    use std::{fs::File, io::Read, path::Path, str};
 
     fn read_class_file(p: &str) -> Result<Vec<u8>, ErrorType> {
         let mut f = File::open(Path::new(p)).unwrap();
         let mut buf = Vec::with_capacity(64);
-    
+
         f.read_to_end(&mut buf).unwrap();
         Ok(buf)
     }
@@ -356,29 +456,39 @@ mod test {
 
         let constant_pool = class.constant_pool;
 
-        if let Constant::Class{tag: _, name_index} = &constant_pool[(class.this_class - 1) as usize] {
-            if let Constant::Utf8{tag: _, length: _, bytes} = &constant_pool[(name_index - 1) as usize] {
+        if let Constant::Class { tag: _, name_index } =
+            &constant_pool[(class.this_class - 1) as usize]
+        {
+            if let Constant::Utf8 {
+                tag: _,
+                length: _,
+                bytes
+            } = &constant_pool[(name_index - 1) as usize]
+            {
                 let s = str::from_utf8(bytes).unwrap();
                 assert_eq!(s, "Hello");
-            }
-            else {
+            } else {
                 panic!("expected Constant::Utf8");
             }
-        }
-        else {
+        } else {
             panic!("expected Constant::Class");
         }
 
-        if let Constant::Class{tag: _, name_index} = &constant_pool[(class.super_class - 1) as usize] {
-            if let Constant::Utf8{tag: _, length: _, bytes} = &constant_pool[(name_index - 1) as usize] {
+        if let Constant::Class { tag: _, name_index } =
+            &constant_pool[(class.super_class - 1) as usize]
+        {
+            if let Constant::Utf8 {
+                tag: _,
+                length: _,
+                bytes
+            } = &constant_pool[(name_index - 1) as usize]
+            {
                 let s = str::from_utf8(bytes).unwrap();
                 assert_eq!(s, "java/lang/Object");
-            }
-            else {
+            } else {
                 panic!("expected Constant::Utf8");
             }
-        }
-        else {
+        } else {
             panic!("expected Constant::Class");
         }
     }
@@ -396,28 +506,35 @@ mod test {
 
         let constant = &constant_pool[(f0.name_index - 1) as usize];
 
-        if let Constant::Utf8 { tag: _, length: _, bytes } = constant {
+        if let Constant::Utf8 {
+            tag: _,
+            length: _,
+            bytes
+        } = constant
+        {
             let s = str::from_utf8(bytes).unwrap();
 
             assert_eq!(s, "test");
             assert_eq!(f0.attributes_count, 1);
             let attribute = &f0.attributes[0];
 
-            if let Attribute::ConstantValue { attribute_name_index: _, attribute_length: _, constantvalue_index } = attribute {
+            if let Attribute::ConstantValue {
+                attribute_name_index: _,
+                attribute_length: _,
+                constantvalue_index
+            } = attribute
+            {
                 let constant = &constant_pool[(constantvalue_index - 1) as usize];
 
-                if let Constant::Integer {tag: _, value} = constant {
+                if let Constant::Integer { tag: _, value } = constant {
                     assert_eq!(*value, 2147483647);
-                }
-                else {
+                } else {
                     panic!("expected Constant::Integer, found {:?}", constant);
                 }
-            }
-            else {
+            } else {
                 panic!("expected Attribute::ConstantValue, found {:?}", attribute);
             }
-        }
-        else {
+        } else {
             panic!("expected Constant::Utf8, found {:?}", constant);
         }
     }

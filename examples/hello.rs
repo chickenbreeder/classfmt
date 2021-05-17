@@ -1,9 +1,4 @@
-use std::{
-    fs::File,
-    path::Path,
-    io,
-    io::Read
-};
+use std::{fs::File, io, io::Read, path::Path};
 
 use classfmt::parser::ClassParser;
 

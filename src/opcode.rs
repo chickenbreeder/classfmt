@@ -1,5 +1,17 @@
-use std::convert::TryFrom;
 use crate::error::ErrorType;
+use std::convert::TryFrom;
+
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub enum Instruction {
+    aload_0,
+    invokespecial { indexbyte1: u8, indexbyte2: u8 },
+    invokevirtual { indexbyte1: u8, indexbyte2: u8 },
+    getstatic { indexbyte1: u8, indexbyte2: u8 },
+    r#eturn,
+    ldc { index: u8 },
+    nop
+}
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -206,7 +218,7 @@ pub enum Opcode {
     sipush = 0x11,
     swap = 0x5f,
     tableswitch = 0xaa,
-    wide = 0xc4,
+    wide = 0xc4
 }
 
 impl TryFrom<u8> for Opcode {
@@ -416,6 +428,7 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::swap as u8 => Ok(Opcode::swap),
             x if x == Opcode::tableswitch as u8 => Ok(Opcode::tableswitch),
             x if x == Opcode::wide as u8 => Ok(Opcode::wide),
+            x if x == Opcode::r#eturn as u8 => Ok(Opcode::r#eturn),
             _ => Err(ErrorType::IntegerConversion)
         }
     }
