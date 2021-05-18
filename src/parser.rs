@@ -636,6 +636,15 @@ impl<'c> ClassParser<'c> {
 
 #[cfg(test)]
 mod test {
+    macro_rules! expect_pat {
+        ($expected: pat, $expr: expr, $then: block) => {
+            if let $expected = $expr $then
+            else {
+                panic!("Expected {:?}, found {:?}", stringify!($expected), $expr);
+            }
+        };
+    }
+
     use super::ClassParser;
     use crate::attribute::Attribute;
     use crate::constant_pool::Constant;
@@ -653,8 +662,9 @@ mod test {
     #[test]
     fn parse_simple() {
         let buf = read_class_file("./tests/Hello.class").unwrap();
-        let mut parser = ClassParser::from_bytes(&buf);
-        let class = parser.parse().unwrap();
+        let class = ClassParser::from_bytes(&buf)
+            .parse()
+            .unwrap();
 
         assert_eq!(class.magic, 0xCAFEBABE);
         assert_eq!(class.methods_count, 2);
@@ -662,48 +672,25 @@ mod test {
 
         let constant_pool = class.constant_pool;
 
-        if let Constant::Class { tag: _, name_index } =
-            &constant_pool[(class.this_class - 1) as usize]
-        {
-            if let Constant::Utf8 {
-                tag: _,
-                length: _,
-                bytes
-            } = &constant_pool[(name_index - 1) as usize]
-            {
-                let s = str::from_utf8(bytes).unwrap();
-                assert_eq!(s, "Hello");
-            } else {
-                panic!("expected Constant::Utf8");
-            }
-        } else {
-            panic!("expected Constant::Class");
-        }
+        expect_pat!(Constant::Class {tag: _, name_index}, &constant_pool[(class.this_class - 1) as usize], {
+            expect_pat!(Constant::Utf8 {tag: _, length: _, bytes}, &constant_pool[(name_index - 1) as usize], {
+                assert_eq!(str::from_utf8(bytes).unwrap(), "Hello");
+            });
+        });
 
-        if let Constant::Class { tag: _, name_index } =
-            &constant_pool[(class.super_class - 1) as usize]
-        {
-            if let Constant::Utf8 {
-                tag: _,
-                length: _,
-                bytes
-            } = &constant_pool[(name_index - 1) as usize]
-            {
-                let s = str::from_utf8(bytes).unwrap();
-                assert_eq!(s, "java/lang/Object");
-            } else {
-                panic!("expected Constant::Utf8");
-            }
-        } else {
-            panic!("expected Constant::Class");
-        }
+        expect_pat!(Constant::Class {tag: _, name_index}, &constant_pool[(class.super_class - 1) as usize], {
+            expect_pat!(Constant::Utf8 {tag: _, length: _, bytes}, &constant_pool[(name_index - 1) as usize], {
+                assert_eq!(str::from_utf8(bytes).unwrap(), "java/lang/Object");
+            });
+        });
     }
 
     #[test]
     fn parse_fields() {
         let buf = read_class_file("./tests/Fields.class").unwrap();
-        let mut parser = ClassParser::from_bytes(&buf);
-        let class = parser.parse().unwrap();
+        let class = ClassParser::from_bytes(&buf)
+            .parse()
+            .unwrap();
 
         assert_eq!(class.field_count, 3);
         let constant_pool = class.constant_pool;
@@ -712,36 +699,16 @@ mod test {
 
         let constant = &constant_pool[(f0.name_index - 1) as usize];
 
-        if let Constant::Utf8 {
-            tag: _,
-            length: _,
-            bytes
-        } = constant
-        {
-            let s = str::from_utf8(bytes).unwrap();
-
-            assert_eq!(s, "test");
+        expect_pat!(Constant::Utf8{tag: _, length: _, bytes}, constant, {
+            assert_eq!(str::from_utf8(bytes).unwrap(), "test");
             assert_eq!(f0.attributes_count, 1);
             let attribute = &f0.attributes[0];
 
-            if let Attribute::ConstantValue {
-                attribute_name_index: _,
-                attribute_length: _,
-                constantvalue_index
-            } = attribute
-            {
-                let constant = &constant_pool[(constantvalue_index - 1) as usize];
-
-                if let Constant::Integer { tag: _, value } = constant {
+            expect_pat!(Attribute::ConstantValue{attribute_name_index: _, attribute_length: _, constantvalue_index}, attribute, {
+                expect_pat!(Constant::Integer{tag: _, value}, &constant_pool[(constantvalue_index - 1) as usize], {
                     assert_eq!(*value, 2147483647);
-                } else {
-                    panic!("expected Constant::Integer, found {:?}", constant);
-                }
-            } else {
-                panic!("expected Attribute::ConstantValue, found {:?}", attribute);
-            }
-        } else {
-            panic!("expected Constant::Utf8, found {:?}", constant);
-        }
+                });
+            });
+        });
     }
 }
