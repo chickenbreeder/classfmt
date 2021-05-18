@@ -8,16 +8,19 @@ use crate::{Attribute, Constant, ConstantTag, Field, Method, Opcode, RawClass, R
 use crate::access_flags::{ClassAccessFlag, FieldAccessFlag, MethodAccessFlag};
 use crate::opcode::Instruction;
 
+/// The class parser. Used to construct instances of [`RawClass`]
 pub struct ClassParser<'c> {
     bytes: &'c [u8],
     offset: usize
 }
 
 impl<'c> ClassParser<'c> {
+    /// Creates a new parser from given bytes
     pub fn from_bytes(bytes: &'c [u8]) -> ClassParser<'c> {
         ClassParser { bytes, offset: 0 }
     }
 
+    /// Parses the provided bytes and tries to construct a new instance of [`RawClass`]
     pub fn parse(&mut self) -> Result<RawClass<'c>, ErrorType> {
         let magic = self.read_u32_be();
         let minor_version = self.read_u16_be();

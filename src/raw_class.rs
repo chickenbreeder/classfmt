@@ -1,6 +1,7 @@
 use crate::access_flags::ClassAccessFlag;
 use crate::{Constant, Field, Method};
 
+/// A class file
 #[derive(Debug)]
 pub struct RawClass<'c> {
     pub magic: u32,
