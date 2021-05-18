@@ -1,6 +1,6 @@
 use std::{fs::File, io, io::Read, path::Path};
 
-use classfmt::parser::ClassParser;
+use classfmt::ClassParser;
 
 fn main() -> io::Result<()> {
     let mut f = File::open(Path::new("./tests/Fields.class"))?;
