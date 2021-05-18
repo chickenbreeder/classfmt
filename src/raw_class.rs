@@ -1,5 +1,5 @@
 use crate::access_flags::ClassAccessFlag;
-use crate::{Constant, Field, Method};
+use crate::{Attribute, Constant, Field, Method};
 
 /// A class file
 #[derive(Debug)]
@@ -16,5 +16,7 @@ pub struct RawClass<'c> {
     pub field_count: u16,
     pub fields: Vec<Field>,
     pub methods_count: u16,
-    pub methods: Vec<Method>
+    pub methods: Vec<Method>,
+    pub attributes_count: u16,
+    pub attributes: Vec<Attribute>
 }

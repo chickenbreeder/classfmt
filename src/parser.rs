@@ -1,11 +1,16 @@
 use std::convert::TryFrom;
 use std::str;
 
-use crate::attribute::{ExceptionTableEntry, LineNumberTableEntry};
+use crate::attribute::{
+    BootstrapMethodAttribute, ExceptionTableEntry, InnerClassAttribute, LineNumberTableEntry,
+    ParameterAttribute
+};
 use crate::error::ErrorType;
 use crate::{Attribute, Constant, ConstantTag, Field, Method, Opcode, RawClass, ReferenceKind};
 
-use crate::access_flags::{ClassAccessFlag, FieldAccessFlag, MethodAccessFlag};
+use crate::access_flags::{
+    ClassAccessFlag, FieldAccessFlag, InnerClassAccessFlag, MethodAccessFlag, ParameterAccessFlag
+};
 use crate::opcode::Instruction;
 
 /// The class parser. Used to construct instances of [`RawClass`]
@@ -35,6 +40,8 @@ impl<'c> ClassParser<'c> {
         let fields = self.read_fields(field_count, &constant_pool)?;
         let methods_count = self.read_u16_be();
         let methods = self.read_methods(methods_count, &constant_pool)?;
+        let attributes_count = self.read_u16_be();
+        let attributes = self.read_attributes(attributes_count, &constant_pool)?;
 
         Ok(RawClass {
             magic,
@@ -49,7 +56,9 @@ impl<'c> ClassParser<'c> {
             field_count,
             fields,
             methods_count,
-            methods
+            methods,
+            attributes_count,
+            attributes
         })
     }
 
@@ -276,8 +285,69 @@ impl<'c> ClassParser<'c> {
                         attribute_length,
                         constant_pool
                     )?,
+                    "InnerClasses" => {
+                        let number_of_classes = self.read_u16_be();
+                        let classes = self.read_inner_class_attributes(number_of_classes);
+
+                        Attribute::InnerClasses {
+                            attribute_name_index,
+                            attribute_length,
+                            number_of_classes,
+                            classes
+                        }
+                    }
                     "LineNumberTable" => self
                         .read_line_number_table_attribute(attribute_name_index, attribute_length)?,
+                    "SourceFile" => {
+                        let sourcefile_index = self.read_u16_be();
+
+                        Attribute::SourceFile {
+                            attribute_name_index,
+                            attribute_length,
+                            sourcefile_index
+                        }
+                    }
+                    "BootstrapMethods" => {
+                        let num_bootstrap_methods = self.read_u16_be();
+                        let bootstrap_methods =
+                            self.read_bootstrap_method_attributes(num_bootstrap_methods);
+
+                        Attribute::BootstrapMethods {
+                            attribute_name_index,
+                            attribute_length,
+                            num_bootstrap_methods,
+                            bootstrap_methods
+                        }
+                    }
+                    "MethodParameters" => {
+                        let parameters_count = self.bytes[self.offset];
+                        self.offset += 1;
+                        let parameters = self.read_method_parameter_attributes(parameters_count);
+
+                        Attribute::MethodParameters {
+                            attribute_name_index,
+                            attribute_length,
+                            parameters_count,
+                            parameters
+                        }
+                    }
+                    "NestMembers" => {
+                        let number_of_classes = self.read_u16_be();
+                        let mut classes = Vec::with_capacity(number_of_classes as usize);
+
+                        let mut i = 0;
+                        while i < number_of_classes {
+                            classes.push(self.read_u16_be());
+                            i += 1;
+                        }
+
+                        Attribute::NestMembers {
+                            attribute_name_index,
+                            attribute_length,
+                            number_of_classes,
+                            classes
+                        }
+                    }
                     _ => panic!("unknown tag: `{}`", s)
                 };
 
@@ -342,6 +412,80 @@ impl<'c> ClassParser<'c> {
         })
     }
 
+    fn read_inner_class_attributes(&mut self, number_of_classes: u16) -> Vec<InnerClassAttribute> {
+        let mut classes = Vec::with_capacity(number_of_classes as usize);
+        let mut i = 0;
+
+        while i < number_of_classes {
+            let inner_class_info_index = self.read_u16_be();
+            let outer_class_info_index = self.read_u16_be();
+            let inner_name_index = self.read_u16_be();
+            let inner_class_access_flags =
+                InnerClassAccessFlag::from_bits(self.read_u16_be()).unwrap();
+
+            classes.push(InnerClassAttribute {
+                inner_class_info_index,
+                outer_class_info_index,
+                inner_name_index,
+                inner_class_access_flags
+            });
+            i += 1;
+        }
+
+        classes
+    }
+
+    fn read_method_parameter_attributes(
+        &mut self,
+        parameters_count: u8
+    ) -> Vec<ParameterAttribute> {
+        let mut parameters = Vec::with_capacity(parameters_count as usize);
+        let mut i = 0;
+
+        while i < parameters_count {
+            let name_index = self.read_u16_be();
+            let access_flags = ParameterAccessFlag::from_bits(self.read_u16_be()).unwrap();
+
+            parameters.push(ParameterAttribute {
+                name_index,
+                access_flags
+            });
+            i += 1;
+        }
+
+        parameters
+    }
+
+    fn read_bootstrap_method_attributes(
+        &mut self,
+        num_bootstrap_methods: u16
+    ) -> Vec<BootstrapMethodAttribute> {
+        let mut methods = Vec::with_capacity(num_bootstrap_methods as usize);
+        let mut i = 0;
+
+        while i < num_bootstrap_methods {
+            let bootstrap_method_ref = self.read_u16_be();
+            let num_bootstrap_arguments = self.read_u16_be();
+            let mut bootstrap_arguments = Vec::with_capacity(num_bootstrap_arguments as usize);
+            let mut j = 0;
+
+            while j < num_bootstrap_arguments {
+                bootstrap_arguments.push(self.read_u16_be());
+                j += 1;
+            }
+
+            methods.push(BootstrapMethodAttribute {
+                bootstrap_method_ref,
+                num_bootstrap_arguments,
+                bootstrap_arguments
+            });
+
+            i += 1;
+        }
+
+        methods
+    }
+
     fn read_line_number_table_attribute(
         &mut self,
         attribute_name_index: u16,
@@ -385,7 +529,65 @@ impl<'c> ClassParser<'c> {
 
             let ins = match opcode {
                 Opcode::aload_0 => Instruction::aload_0,
+                Opcode::aload_1 => Instruction::aload_1,
+                Opcode::aload_2 => Instruction::aload_2,
+                Opcode::aload_3 => Instruction::aload_3,
+                Opcode::astore => {
+                    let index = self.bytes[offset];
+                    offset += 1;
+
+                    Instruction::astore { index }
+                }
+                Opcode::astore_0 => Instruction::astore_0,
+                Opcode::astore_1 => Instruction::astore_1,
+                Opcode::astore_2 => Instruction::astore_2,
+                Opcode::astore_3 => Instruction::astore_3,
+                Opcode::dup => Instruction::dup,
+                Opcode::bipush => {
+                    let byte = self.bytes[offset];
+                    offset += 1;
+
+                    Instruction::bipush { byte }
+                }
+                Opcode::new => {
+                    let indexbyte1 = self.bytes[offset];
+                    let indexbyte2 = self.bytes[offset + 1];
+                    offset += 2;
+
+                    Instruction::new {
+                        indexbyte1,
+                        indexbyte2
+                    }
+                }
                 Opcode::r#eturn => Instruction::r#eturn,
+                Opcode::invokedynamic => {
+                    let indexbyte1 = self.bytes[offset];
+                    let indexbyte2 = self.bytes[offset + 1];
+                    let byte3 = self.bytes[offset + 2];
+                    let byte4 = self.bytes[offset + 3];
+                    offset += 4;
+
+                    if byte3 != 0 || byte4 != 0 {
+                        return Err(ErrorType::ParseError);
+                    }
+
+                    Instruction::invokedynamic {
+                        indexbyte1,
+                        indexbyte2,
+                        byte3,
+                        byte4
+                    }
+                }
+                Opcode::invokestatic => {
+                    let indexbyte1 = self.bytes[offset];
+                    let indexbyte2 = self.bytes[offset + 1];
+                    offset += 2;
+
+                    Instruction::invokestatic {
+                        indexbyte1,
+                        indexbyte2
+                    }
+                }
                 Opcode::invokespecial => {
                     let indexbyte1 = self.bytes[offset];
                     let indexbyte2 = self.bytes[offset + 1];

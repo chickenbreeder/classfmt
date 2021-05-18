@@ -5,11 +5,50 @@ use std::convert::TryFrom;
 #[allow(non_camel_case_types)]
 pub enum Instruction {
     aload_0,
-    invokespecial { indexbyte1: u8, indexbyte2: u8 },
-    invokevirtual { indexbyte1: u8, indexbyte2: u8 },
-    getstatic { indexbyte1: u8, indexbyte2: u8 },
+    aload_1,
+    aload_2,
+    aload_3,
+    astore {
+        index: u8
+    },
+    astore_0,
+    astore_1,
+    astore_2,
+    astore_3,
+    dup,
+    bipush {
+        byte: u8
+    },
+    invokedynamic {
+        indexbyte1: u8,
+        indexbyte2: u8,
+        byte3: u8,
+        byte4: u8
+    },
+    invokespecial {
+        indexbyte1: u8,
+        indexbyte2: u8
+    },
+    invokestatic {
+        indexbyte1: u8,
+        indexbyte2: u8
+    },
+    invokevirtual {
+        indexbyte1: u8,
+        indexbyte2: u8
+    },
+    getstatic {
+        indexbyte1: u8,
+        indexbyte2: u8
+    },
+    new {
+        indexbyte1: u8,
+        indexbyte2: u8
+    },
     r#eturn,
-    ldc { index: u8 },
+    ldc {
+        index: u8
+    },
     nop
 }
 

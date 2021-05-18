@@ -69,3 +69,14 @@ bitflags! {
         const ENUM = 0x4000;
     }
 }
+
+bitflags! {
+
+    /// Field access bitflags<br>
+    /// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5> for more information
+    pub struct ParameterAccessFlag: u16 {
+        const FINAL = 0x0010;
+        const SYNTHETIC = 0x1000;
+        const MANDATED = 0x8000;
+    }
+}
