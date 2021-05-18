@@ -3,7 +3,7 @@
 bitflags! {
 
     /// Class access bitflags<br>
-    /// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.1> for more information
+    /// See <https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.1> for more information
     pub struct ClassAccessFlag: u16 {
         const PUBLIC = 0x0001;
         const FINAL = 0x0010;
@@ -18,7 +18,7 @@ bitflags! {
 bitflags! {
 
     /// Inner class access bitflags<br>
-    /// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.6> for more information
+    /// See <https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.7.6> for more information
     pub struct InnerClassAccessFlag: u16 {
         const PUBLIC = 0x0001;
         const PRIVATE = 0x0002;
@@ -36,7 +36,7 @@ bitflags! {
 bitflags! {
 
     /// Method access bitflags<br>
-    /// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6> for more information
+    /// See <https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.6> for more information
     pub struct MethodAccessFlag: u16 {
         const PUBLIC = 0x0001;
         const PRIVATE = 0x0002;
@@ -56,7 +56,7 @@ bitflags! {
 bitflags! {
 
     /// Field access bitflags<br>
-    /// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5> for more information
+    /// See <https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.5> for more information
     pub struct FieldAccessFlag: u16 {
         const PUBLIC = 0x0001;
         const PRIVATE = 0x0002;
@@ -72,8 +72,8 @@ bitflags! {
 
 bitflags! {
 
-    /// Field access bitflags<br>
-    /// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.5> for more information
+    /// Parameter access bitflags<br>
+    /// See <https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.7.24> for more information
     pub struct ParameterAccessFlag: u16 {
         const FINAL = 0x0010;
         const SYNTHETIC = 0x1000;

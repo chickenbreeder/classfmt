@@ -80,7 +80,7 @@ impl TryFrom<u8> for ReferenceKind {
 }
 
 /// Represents a constant pool element<br/>
-/// See <https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4> for more information
+/// See <https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4> for more information
 #[derive(Debug)]
 pub enum Constant<'c> {
     Class {
